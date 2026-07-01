@@ -239,14 +239,20 @@ function renderItemRow(item){
   return `<div class="item-row-wrap"><div class="item-row ${taken?'taken':''}">${inner}</div>${formHtml}</div>`;
 }
 
+function genReleaseCode(){
+  return Math.random().toString(36).slice(2,6).toUpperCase();
+}
+
 async function onConfirmReserve(id){
   const name = document.getElementById(`rname-${id}`).value.trim();
   const message = document.getElementById(`rmsg-${id}`).value.trim();
   if(!name){ showToast('Escreva seu nome para reservar.'); return; }
 
+  const releaseCode = genReleaseCode();
+
   // Atualiza só se ainda ninguém reservou (evita corrida entre dois convidados)
   const { data, error } = await sb.from('diaper_items')
-    .update({ claimed_by: name, message, claimed_at: new Date().toISOString() })
+    .update({ claimed_by: name, message, claimed_at: new Date().toISOString(), release_code: releaseCode })
     .eq('id', id)
     .is('claimed_by', null)
     .select();
@@ -257,19 +263,39 @@ async function onConfirmReserve(id){
     await loadItems();
     return;
   }
+  localStorage.setItem('diaper_release_' + id, releaseCode);
   expandedRow = null;
-  showToast('Reservado! Obrigado 💛');
   await loadItems();
+  alert('Reservado! Guarde este código caso queira desfazer a reserva depois:\n\n' + releaseCode + '\n\n(Neste mesmo aparelho e navegador, o botão "liberar" já vai lembrar sozinho.)');
 }
 
 async function onRelease(id){
-  if(!confirm('Liberar esta reserva?')) return;
-  const { error } = await sb.from('diaper_items')
-    .update({ claimed_by: null, message: null, claimed_at: null })
-    .eq('id', id);
+  const savedCode = localStorage.getItem('diaper_release_' + id);
+  let code = savedCode;
+  if(!code){
+    code = prompt('Digite o código de 4 dígitos que foi mostrado para quem reservou este item:');
+    if(!code) return;
+    code = code.trim().toUpperCase();
+  } else {
+    if(!confirm('Liberar esta reserva?')) return;
+  }
+
+  const { data, error } = await sb.from('diaper_items')
+    .update({ claimed_by: null, message: null, claimed_at: null, release_code: null })
+    .eq('id', id)
+    .eq('release_code', code)
+    .select();
+
   if(error){ showToast('Erro ao liberar: ' + error.message); return; }
+  if(!data || data.length === 0){
+    showToast('Código incorreto. Peça para quem reservou, ou peça para a anfitriã liberar direto pelo banco de dados.');
+    return;
+  }
+  localStorage.removeItem('diaper_release_' + id);
+  showToast('Reserva liberada.');
   await loadItems();
 }
+
 
 // Atualiza em tempo real quando outra pessoa reserva/libera algo
 sb.channel('diaper_items_changes')
