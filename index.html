@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chá de Fralda de Maria Luiza</title>
+<title>Chá de Fralda</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Karla:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -52,7 +52,7 @@
   .filter-btn{ font-family:'Baloo 2'; font-weight:700; font-size:13.5px; background: #F2F6F2; color: var(--sage); border:1.5px solid var(--sage-pale); padding:7px 16px; border-radius:999px; cursor:pointer; }
   .filter-btn.active{ background: var(--sage); color:white; border-color: var(--sage); }
   .filter-check{ margin-left:auto; display:flex; align-items:center; gap:6px; font-size:13px; color: var(--ink-soft); }
-  .group-header{ display:flex; justify-content:space-between; align-items:baseline; margin: 20px 0 8px; }
+  .group-header{ display:flex; justify-content:space-between; align-items:baseline; margin: 20px 0 8px; position: sticky; top: 0; background: var(--card); padding: 10px 0; z-index: 5; border-bottom: 2px solid var(--sage-pale); }
   .group-header:first-child{ margin-top:2px; }
   .group-title{ font-family:'Baloo 2'; font-weight:700; font-size:17px; }
   .group-sub{ font-family:'Space Mono', monospace; font-size:12px; color: var(--ink-soft); }
@@ -98,7 +98,7 @@ const SUPABASE_URL = 'https://hlenzywbobdinapytwre.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_HighvqdWWG7FhY8qYYC7sA_IjiSuaYs';
 
 /* Nome do bebê exibido no topo da página */
-const BABY_NAME = 'Maria Luiza'; // troque, ex: 'Alice'
+const BABY_NAME = 'nosso bebê'; // troque, ex: 'Alice'
 /* ======================================================= */
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -193,6 +193,11 @@ function render(){
       ${overviewRows}
     </div>
 
+    <div class="card" style="background:#F2F6F2; border-color:var(--sage-pale);">
+      <strong style="font-family:'Baloo 2'; font-size:14px; color:var(--sage);">💡 Como funciona:</strong>
+      <span style="font-size:13.5px; color:var(--ink-soft);"> cada número da lista já é um combo — <strong>1 pacote de fralda do tamanho indicado + o produto ao lado</strong>. Escolha um número disponível e traga os dois itens juntos.</span>
+    </div>
+
     <div class="card">
       <div class="filter-bar">
         <button class="filter-btn ${sizeFilter==='ALL'?'active':''}" data-filter="ALL">Todos</button>
@@ -218,11 +223,11 @@ function renderItemRow(item){
   let inner;
   if(taken){
     inner = `
-      <div class="item-left"><span class="item-num">Nº ${item.id}</span><span class="item-desc">${escapeHtml(item.extra_item)}</span></div>
+      <div class="item-left"><span class="item-num">Nº ${item.id}</span><span class="item-desc"><strong>1 pacote de fralda ${item.size}</strong> + ${escapeHtml(item.extra_item)}</span></div>
       <div class="item-right"><span class="badge-taken">Reservado por ${escapeHtml(item.claimed_by)}</span><button class="btn-release" data-release="${item.id}">liberar</button></div>`;
   } else {
     inner = `
-      <div class="item-left"><span class="item-num">Nº ${item.id}</span><span class="item-desc">${escapeHtml(item.extra_item)}</span></div>
+      <div class="item-left"><span class="item-num">Nº ${item.id}</span><span class="item-desc"><strong>1 pacote de fralda ${item.size}</strong> + ${escapeHtml(item.extra_item)}</span></div>
       <div class="item-right"><button class="btn-reserve" data-reserve="${item.id}">Reservar</button></div>`;
   }
   const formHtml = expandedRow === item.id && !taken ? `
