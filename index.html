@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chá de Fralda</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Karla:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg: #EAF1EA;
+    --card: #FFFFFF;
+    --ink: #253434;
+    --ink-soft: #5C6E6E;
+    --coral: #F4886B;
+    --coral-deep: #E06B4C;
+    --gold: #E8B75A;
+    --sage: #5C7A6B;
+    --sage-pale: #C9DACB;
+    --line: #D7E2D9;
+    --radius: 18px;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; background: var(--bg); color: var(--ink); font-family: 'Karla', sans-serif; -webkit-font-smoothing: antialiased; }
+  body{
+    background-image:
+      radial-gradient(circle at 15% 8%, rgba(232,183,90,0.12), transparent 40%),
+      radial-gradient(circle at 85% 12%, rgba(244,136,107,0.10), transparent 40%);
+    min-height: 100vh; padding: 32px 16px 64px;
+  }
+  .wrap{ max-width: 760px; margin: 0 auto; }
+  h1,h2,h3{ font-family: 'Baloo 2', sans-serif; margin: 0; }
+  header.hero{ text-align:center; margin-bottom: 24px; }
+  .eyebrow{ font-family:'Space Mono', monospace; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--sage); font-weight:700; display:block; margin-bottom:8px; }
+  h1.title{ font-size: 32px; font-weight:700; line-height:1.15; }
+  .subtitle{ color: var(--ink-soft); font-size:15px; margin-top:10px; line-height:1.5; }
+  .card{ background: var(--card); border-radius: var(--radius); padding: 22px; box-shadow: 0 1px 2px rgba(37,52,52,0.04), 0 8px 24px -12px rgba(37,52,52,0.10); border: 1px solid var(--line); margin-bottom: 18px; }
+  .priority{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; background: linear-gradient(135deg, rgba(244,136,107,0.14), rgba(232,183,90,0.14)); border: 1px solid rgba(224,107,76,0.25); }
+  .priority .label{ font-family:'Baloo 2'; font-weight:700; font-size:14px; color: var(--coral-deep); }
+  .chip{ font-family:'Space Mono', monospace; font-size:13px; font-weight:700; background: var(--coral); color:white; padding:5px 12px; border-radius:999px; }
+  .priority.done{ background: linear-gradient(135deg, rgba(92,122,107,0.10), rgba(201,218,203,0.25)); border-color: var(--sage-pale); }
+  .priority.done .label{ color: var(--sage); }
+  .size-overview-row{ padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .size-overview-row:last-child{ border-bottom:none; }
+  .size-overview-top{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+  .size-code{ font-family:'Baloo 2'; font-weight:800; font-size:20px; }
+  .size-count{ font-family:'Space Mono', monospace; font-size:12.5px; color: var(--ink-soft); }
+  .progress-track{ margin-top:8px; height:10px; border-radius:999px; background: var(--sage-pale); overflow:hidden; }
+  .progress-fill{ height:100%; border-radius:999px; background: linear-gradient(90deg, var(--coral), var(--coral-deep)); transition: width .3s ease; }
+  .filter-bar{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:4px; }
+  .filter-btn{ font-family:'Baloo 2'; font-weight:700; font-size:13.5px; background: #F2F6F2; color: var(--sage); border:1.5px solid var(--sage-pale); padding:7px 16px; border-radius:999px; cursor:pointer; }
+  .filter-btn.active{ background: var(--sage); color:white; border-color: var(--sage); }
+  .filter-check{ margin-left:auto; display:flex; align-items:center; gap:6px; font-size:13px; color: var(--ink-soft); }
+  .group-header{ display:flex; justify-content:space-between; align-items:baseline; margin: 20px 0 8px; }
+  .group-header:first-child{ margin-top:2px; }
+  .group-title{ font-family:'Baloo 2'; font-weight:700; font-size:17px; }
+  .group-sub{ font-family:'Space Mono', monospace; font-size:12px; color: var(--ink-soft); }
+  .item-row{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding: 10px 12px; border-radius: 12px; margin-bottom:6px; background:#FBFDFB; border:1px solid var(--line); }
+  .item-row.taken{ background:#F5F2ED; }
+  .item-left{ display:flex; align-items:baseline; gap:10px; min-width:0; }
+  .item-num{ font-family:'Space Mono', monospace; font-weight:700; font-size:13px; color: var(--sage); flex-shrink:0; }
+  .item-desc{ font-size:14px; }
+  .item-right{ flex-shrink:0; display:flex; align-items:center; gap:8px; }
+  .btn-reserve{ font-family:'Baloo 2'; font-weight:700; font-size:13px; background: var(--coral-deep); color:white; border:none; padding:7px 14px; border-radius:999px; cursor:pointer; }
+  .btn-release{ font-family:'Karla'; font-size:11.5px; color: var(--ink-soft); background:none; border:none; text-decoration:underline; cursor:pointer; padding:2px; }
+  .badge-taken{ font-family:'Space Mono', monospace; font-size:11px; font-weight:700; color: var(--sage); background: var(--sage-pale); padding:3px 9px; border-radius:999px; }
+  .reserve-form{ grid-column: 1 / -1; width:100%; margin-top:8px; padding-top:10px; border-top:1px dashed var(--line); }
+  .reserve-form input, .reserve-form textarea{ width:100%; padding:9px 11px; border-radius:10px; border:1.5px solid var(--line); font-family:'Karla'; font-size:14px; margin-bottom:8px; background:white; }
+  .reserve-form input:focus, .reserve-form textarea:focus{ outline:none; border-color: var(--coral); box-shadow: 0 0 0 3px rgba(244,136,107,0.15); }
+  .reserve-form-actions{ display:flex; gap:8px; }
+  .btn-confirm{ font-family:'Baloo 2'; font-weight:700; font-size:13.5px; background: var(--coral-deep); color:white; border:none; padding:8px 16px; border-radius:999px; cursor:pointer; }
+  .btn-cancel{ font-family:'Karla'; font-size:13px; color: var(--ink-soft); background:none; border:1.5px solid var(--line); padding:8px 14px; border-radius:999px; cursor:pointer; }
+  .item-row-wrap{ display:flex; flex-direction:column; }
+  label{ display:block; font-size:12.5px; font-weight:600; margin-bottom:4px; }
+  .footer-note{ text-align:center; font-size:12px; color: var(--ink-soft); margin-top: 8px; line-height:1.6; }
+  .toast{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background: var(--ink); color:white; padding:12px 20px; border-radius:12px; font-size:14px; opacity:0; pointer-events:none; transition: opacity .25s ease, bottom .25s ease; z-index:50; max-width:90vw; text-align:center; }
+  .toast.show{ opacity:1; bottom:32px; }
+  .loading{ text-align:center; padding: 60px 0; color: var(--ink-soft); }
+  @media (max-width:480px){ .item-left{ flex-wrap:wrap; } }
+</style>
+</head>
+<body>
+  <div class="wrap" id="app">
+    <div class="loading" id="loading">Carregando a lista… 🧷</div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+<script>
+/* =======================================================
+   CONFIGURAÇÃO — troque pelos dados do SEU projeto Supabase
+   Encontre em: Supabase > seu projeto > Settings > API
+   - SUPABASE_URL = campo "API URL" (antigo "Project URL")
+   - SUPABASE_ANON_KEY = aba "API Keys" > "Publishable key"
+     (ou "anon public", em contas com o sistema antigo)
+   ======================================================= */
+const SUPABASE_URL = 'https://hlenzywbobdinapytwre.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_HighvqdWWG7FhY8qYYC7sA_IjiSuaYs';
+
+/* Nome do bebê exibido no topo da página */
+const BABY_NAME = 'nosso bebê'; // troque, ex: 'Alice'
+/* ======================================================= */
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SIZE_ORDER = ['P','M','G'];
+
+let items = [];
+let sizeFilter = 'ALL';
+let onlyAvailable = false;
+let expandedRow = null;
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=> t.classList.remove('show'), 2800);
+}
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str == null ? '' : str;
+  return d.innerHTML;
+}
+
+async function loadItems(){
+  const { data, error } = await sb.from('diaper_items').select('*').order('id');
+  if(error){
+    document.getElementById('app').innerHTML = `
+      <div class="loading">
+        <p>⚠️ Não consegui carregar a lista.</p>
+        <p style="font-size:12.5px; margin-top:8px;">Detalhe técnico: ${escapeHtml(error.message)}</p>
+        <p style="font-size:12.5px; margin-top:8px;">Confira se SUPABASE_URL e SUPABASE_ANON_KEY estão preenchidos corretamente no arquivo index.html.</p>
+      </div>`;
+    return;
+  }
+  items = data;
+  render();
+}
+
+function statsFor(size){
+  const list = items.filter(i => i.size === size);
+  const claimed = list.filter(i => i.claimed_by).length;
+  return { total: list.length, claimed };
+}
+
+function render(){
+  const app = document.getElementById('app');
+
+  const overviewRows = SIZE_ORDER.map(size => {
+    const { total, claimed } = statsFor(size);
+    const pct = total ? Math.round((claimed/total)*100) : 0;
+    return `
+      <div class="size-overview-row">
+        <div class="size-overview-top">
+          <span class="size-code">${size}</span>
+          <span class="size-count">${claimed} de ${total} reservados</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+      </div>`;
+  }).join('');
+
+  const needy = SIZE_ORDER.map(size => ({ size, ...statsFor(size) }))
+    .filter(x => x.claimed < x.total)
+    .sort((a,b) => (a.claimed/a.total) - (b.claimed/b.total))
+    .slice(0,3);
+
+  const priorityBlock = needy.length
+    ? `<div class="card priority"><span class="label">🎯 Ainda tem bastante item livre em:</span>${needy.map(n => `<span class="chip">${n.size}</span>`).join('')}</div>`
+    : `<div class="card priority done"><span class="label">🎉 Todos os 100 itens da lista já foram reservados!</span></div>`;
+
+  const sizesToShow = sizeFilter === 'ALL' ? SIZE_ORDER : [sizeFilter];
+  const groupsHtml = sizesToShow.map(size => {
+    const { total, claimed } = statsFor(size);
+    const rows = items.filter(i => i.size === size)
+      .filter(i => !onlyAvailable || !i.claimed_by)
+      .map(i => renderItemRow(i)).join('');
+    return `
+      <div class="group-header"><span class="group-title">Fralda ${size}</span><span class="group-sub">${claimed}/${total} reservados</span></div>
+      ${rows || '<p style="font-size:13px;color:var(--ink-soft);">Nenhum item disponível com esse filtro.</p>'}`;
+  }).join('');
+
+  app.innerHTML = `
+    <header class="hero">
+      <span class="eyebrow">Chá de Fralda</span>
+      <h1 class="title">Fraldas para ${escapeHtml(BABY_NAME)}</h1>
+      <p class="subtitle">Escolha um número disponível na lista abaixo. Cada item já vem combinado com uma fralda + um produtinho, então é só reservar o seu e trazer os dois juntos. Obrigado por fazer parte disso! 💛</p>
+    </header>
+
+    ${priorityBlock}
+
+    <div class="card">
+      <h2 style="font-size:18px; margin-bottom:6px;">Progresso geral</h2>
+      ${overviewRows}
+    </div>
+
+    <div class="card">
+      <div class="filter-bar">
+        <button class="filter-btn ${sizeFilter==='ALL'?'active':''}" data-filter="ALL">Todos</button>
+        ${SIZE_ORDER.map(s => `<button class="filter-btn ${sizeFilter===s?'active':''}" data-filter="${s}">${s}</button>`).join('')}
+        <label class="filter-check"><input type="checkbox" id="only-available" ${onlyAvailable ? 'checked' : ''}> Só disponíveis</label>
+      </div>
+      ${groupsHtml}
+    </div>
+
+    <p class="footer-note">Este link pode ser aberto por qualquer pessoa, sem precisar de login ou conta. As reservas aparecem para todo mundo em tempo real.</p>
+  `;
+
+  document.getElementById('only-available').addEventListener('change', (e) => { onlyAvailable = e.target.checked; render(); });
+  document.querySelectorAll('[data-filter]').forEach(btn => btn.addEventListener('click', () => { sizeFilter = btn.getAttribute('data-filter'); render(); }));
+  document.querySelectorAll('[data-reserve]').forEach(btn => btn.addEventListener('click', () => { expandedRow = parseInt(btn.getAttribute('data-reserve'),10); render(); }));
+  document.querySelectorAll('[data-cancel]').forEach(btn => btn.addEventListener('click', () => { expandedRow = null; render(); }));
+  document.querySelectorAll('[data-confirm]').forEach(btn => btn.addEventListener('click', () => onConfirmReserve(parseInt(btn.getAttribute('data-confirm'),10))));
+  document.querySelectorAll('[data-release]').forEach(btn => btn.addEventListener('click', () => onRelease(parseInt(btn.getAttribute('data-release'),10))));
+}
+
+function renderItemRow(item){
+  const taken = !!item.claimed_by;
+  let inner;
+  if(taken){
+    inner = `
+      <div class="item-left"><span class="item-num">Nº ${item.id}</span><span class="item-desc">${escapeHtml(item.extra_item)}</span></div>
+      <div class="item-right"><span class="badge-taken">Reservado por ${escapeHtml(item.claimed_by)}</span><button class="btn-release" data-release="${item.id}">liberar</button></div>`;
+  } else {
+    inner = `
+      <div class="item-left"><span class="item-num">Nº ${item.id}</span><span class="item-desc">${escapeHtml(item.extra_item)}</span></div>
+      <div class="item-right"><button class="btn-reserve" data-reserve="${item.id}">Reservar</button></div>`;
+  }
+  const formHtml = expandedRow === item.id && !taken ? `
+    <div class="reserve-form">
+      <label for="rname-${item.id}">Seu nome</label>
+      <input type="text" id="rname-${item.id}" placeholder="Ex: Tia Marcela">
+      <label for="rmsg-${item.id}">Recadinho (opcional)</label>
+      <textarea id="rmsg-${item.id}" rows="2" placeholder="Uma mensagem carinhosa"></textarea>
+      <div class="reserve-form-actions">
+        <button class="btn-confirm" data-confirm="${item.id}">Confirmar</button>
+        <button class="btn-cancel" data-cancel="${item.id}">Cancelar</button>
+      </div>
+    </div>` : '';
+  return `<div class="item-row-wrap"><div class="item-row ${taken?'taken':''}">${inner}</div>${formHtml}</div>`;
+}
+
+async function onConfirmReserve(id){
+  const name = document.getElementById(`rname-${id}`).value.trim();
+  const message = document.getElementById(`rmsg-${id}`).value.trim();
+  if(!name){ showToast('Escreva seu nome para reservar.'); return; }
+
+  // Atualiza só se ainda ninguém reservou (evita corrida entre dois convidados)
+  const { data, error } = await sb.from('diaper_items')
+    .update({ claimed_by: name, message, claimed_at: new Date().toISOString() })
+    .eq('id', id)
+    .is('claimed_by', null)
+    .select();
+
+  if(error){ showToast('Erro ao reservar: ' + error.message); return; }
+  if(!data || data.length === 0){
+    showToast('Ops, esse item acabou de ser reservado por outra pessoa!');
+    await loadItems();
+    return;
+  }
+  expandedRow = null;
+  showToast('Reservado! Obrigado 💛');
+  await loadItems();
+}
+
+async function onRelease(id){
+  if(!confirm('Liberar esta reserva?')) return;
+  const { error } = await sb.from('diaper_items')
+    .update({ claimed_by: null, message: null, claimed_at: null })
+    .eq('id', id);
+  if(error){ showToast('Erro ao liberar: ' + error.message); return; }
+  await loadItems();
+}
+
+// Atualiza em tempo real quando outra pessoa reserva/libera algo
+sb.channel('diaper_items_changes')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'diaper_items' }, () => { loadItems(); })
+  .subscribe();
+
+loadItems();
+</script>
+</body>
+</html>
