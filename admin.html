@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel — Chá de Fralda</title>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Karla:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg: #EAF1EA; --card: #FFFFFF; --ink: #253434; --ink-soft: #5C6E6E;
+    --coral: #F4886B; --coral-deep: #E06B4C; --gold: #E8B75A;
+    --sage: #5C7A6B; --sage-pale: #C9DACB; --line: #D7E2D9; --radius: 16px;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; background:var(--bg); color:var(--ink); font-family:'Karla',sans-serif; }
+  body{ padding: 28px 16px 60px; }
+  .wrap{ max-width: 1000px; margin:0 auto; }
+  h1,h2{ font-family:'Baloo 2', sans-serif; margin:0; }
+  h1{ font-size:26px; }
+  .card{ background:var(--card); border-radius:var(--radius); padding:20px; border:1px solid var(--line); box-shadow:0 1px 2px rgba(0,0,0,0.04); margin-bottom:18px; }
+  .lock-screen{ max-width:380px; margin: 80px auto; text-align:center; }
+  .lock-screen input{ width:100%; padding:12px; border-radius:10px; border:1.5px solid var(--line); font-size:16px; margin:14px 0; text-align:center; }
+  .lock-screen button{ background:var(--coral-deep); color:white; border:none; padding:12px 24px; border-radius:999px; font-family:'Baloo 2'; font-weight:700; cursor:pointer; font-size:15px; }
+  .stats-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap:12px; margin-top:10px; }
+  .stat-box{ background:#F7FAF7; border:1px solid var(--line); border-radius:12px; padding:14px; text-align:center; }
+  .stat-num{ font-family:'Space Mono', monospace; font-weight:700; font-size:26px; color:var(--coral-deep); display:block; }
+  .stat-label{ font-size:12px; color:var(--ink-soft); }
+  table{ width:100%; border-collapse:collapse; font-size:13.5px; }
+  th{ text-align:left; font-family:'Baloo 2'; font-size:12.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--sage); padding:8px 10px; border-bottom:2px solid var(--sage-pale); position:sticky; top:0; background:var(--card); }
+  td{ padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  tr.taken{ background:#FAF9F5; }
+  tr.empty td{ color: var(--ink-soft); font-style:italic; }
+  .table-wrap{ max-height:70vh; overflow-y:auto; border:1px solid var(--line); border-radius:12px; }
+  .btn-admin-release{ font-family:'Karla'; font-size:12px; color:#C0503A; background:none; border:1px solid #E8B0A0; padding:4px 10px; border-radius:999px; cursor:pointer; }
+  input#search{ width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid var(--line); font-size:14px; margin-bottom:12px; }
+  .filter-row{ display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .filter-row button{ font-family:'Baloo 2'; font-weight:700; font-size:13px; background:#F2F6F2; color:var(--sage); border:1.5px solid var(--sage-pale); padding:7px 14px; border-radius:999px; cursor:pointer; }
+  .filter-row button.active{ background:var(--sage); color:white; }
+  .refresh-note{ font-size:12px; color:var(--ink-soft); text-align:right; margin-top:8px; }
+</style>
+</head>
+<body>
+  <div class="wrap" id="app">
+    <div class="lock-screen card">
+      <h1>🔒 Painel administrativo</h1>
+      <p style="color:var(--ink-soft); font-size:14px;">Digite a senha para ver as reservas do chá.</p>
+      <input type="password" id="admin-pass" placeholder="Senha">
+      <br>
+      <button id="unlock-btn">Entrar</button>
+      <p id="lock-error" style="color:#C0503A; font-size:13px; display:none;">Senha incorreta.</p>
+    </div>
+  </div>
+
+<script>
+/* ======================================================= 
+   CONFIGURAÇÃO — use os MESMOS dados do index.html
+   ======================================================= */
+const SUPABASE_URL = 'https://hlenzywbobdinapytwre.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_HighvqdWWG7FhY8qYYC7sA_IjiSuaYs';
+
+/* Senha para acessar este painel — troque por algo só seu e da sua esposa */
+const ADMIN_PASSWORD = 'marialuiza2026';
+/* ======================================================= */
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let items = [];
+let statusFilter = 'ALL'; // ALL | TAKEN | FREE
+let searchTerm = '';
+
+document.getElementById('unlock-btn').addEventListener('click', tryUnlock);
+document.getElementById('admin-pass').addEventListener('keydown', (e) => { if(e.key === 'Enter') tryUnlock(); });
+
+function tryUnlock(){
+  const val = document.getElementById('admin-pass').value;
+  if(val === ADMIN_PASSWORD){
+    sessionStorage.setItem('diaper_admin_ok', '1');
+    boot();
+  } else {
+    document.getElementById('lock-error').style.display = 'block';
+  }
+}
+
+async function boot(){
+  const app = document.getElementById('app');
+  app.innerHTML = `<div class="card"><p>Carregando painel… 🧷</p></div>`;
+  await loadItems();
+
+  sb.channel('admin_diaper_items_changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'diaper_items' }, () => { loadItems(); })
+    .subscribe();
+}
+
+async function loadItems(){
+  const { data, error } = await sb.from('diaper_items').select('*').order('id');
+  if(error){
+    document.getElementById('app').innerHTML = `<div class="card"><p>⚠️ Erro ao carregar: ${escapeHtml(error.message)}</p></div>`;
+    return;
+  }
+  items = data;
+  render();
+}
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str == null ? '' : str;
+  return d.innerHTML;
+}
+
+function render(){
+  const app = document.getElementById('app');
+  const total = items.length;
+  const taken = items.filter(i => i.claimed_by).length;
+  const free = total - taken;
+  const sizes = ['P','M','G'];
+
+  const statBoxes = sizes.map(s => {
+    const list = items.filter(i => i.size === s);
+    const c = list.filter(i => i.claimed_by).length;
+    return `<div class="stat-box"><span class="stat-num">${c}/${list.length}</span><span class="stat-label">Fralda ${s}</span></div>`;
+  }).join('');
+
+  let filtered = items;
+  if(statusFilter === 'TAKEN') filtered = filtered.filter(i => i.claimed_by);
+  if(statusFilter === 'FREE') filtered = filtered.filter(i => !i.claimed_by);
+  if(searchTerm.trim()){
+    const t = searchTerm.trim().toLowerCase();
+    filtered = filtered.filter(i =>
+      (i.claimed_by || '').toLowerCase().includes(t) ||
+      (i.message || '').toLowerCase().includes(t) ||
+      String(i.id).includes(t) ||
+      (i.extra_item || '').toLowerCase().includes(t)
+    );
+  }
+
+  const rows = filtered.map(i => `
+    <tr class="${i.claimed_by ? 'taken' : ''}">
+      <td>${i.id}</td>
+      <td>${i.size}</td>
+      <td>${escapeHtml(i.extra_item)}</td>
+      <td>${i.claimed_by ? escapeHtml(i.claimed_by) : '—'}</td>
+      <td>${i.message ? escapeHtml(i.message) : ''}</td>
+      <td>${i.claimed_at ? new Date(i.claimed_at).toLocaleString('pt-BR') : ''}</td>
+      <td>${i.claimed_by ? `<button class="btn-admin-release" data-admin-release="${i.id}">liberar</button>` : ''}</td>
+    </tr>`).join('') || `<tr class="empty"><td colspan="7">Nenhum item encontrado.</td></tr>`;
+
+  app.innerHTML = `
+    <h1>🔐 Painel — Chá de Fralda</h1>
+    <p style="color:var(--ink-soft); font-size:14px; margin-top:4px;">Visão geral de todas as reservas, em tempo real.</p>
+
+    <div class="card">
+      <div class="stats-grid">
+        <div class="stat-box"><span class="stat-num">${taken}/${total}</span><span class="stat-label">Total reservado</span></div>
+        <div class="stat-box"><span class="stat-num">${free}</span><span class="stat-label">Ainda livres</span></div>
+        ${statBoxes}
+      </div>
+    </div>
+
+    <div class="card">
+      <input type="text" id="search" placeholder="Buscar por nome, número, item ou mensagem...">
+      <div class="filter-row">
+        <button data-status="ALL" class="${statusFilter==='ALL'?'active':''}">Todos (${total})</button>
+        <button data-status="TAKEN" class="${statusFilter==='TAKEN'?'active':''}">Reservados (${taken})</button>
+        <button data-status="FREE" class="${statusFilter==='FREE'?'active':''}">Livres (${free})</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nº</th><th>Tam.</th><th>Item</th><th>Reservado por</th><th>Mensagem</th><th>Quando</th><th></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <p class="refresh-note">Atualiza sozinho quando alguém reserva ou libera algo.</p>
+    </div>
+  `;
+
+  document.getElementById('search').addEventListener('input', (e) => { searchTerm = e.target.value; render(); });
+  document.getElementById('search').value = searchTerm;
+  document.querySelectorAll('[data-status]').forEach(btn => btn.addEventListener('click', () => { statusFilter = btn.getAttribute('data-status'); render(); }));
+  document.querySelectorAll('[data-admin-release]').forEach(btn => btn.addEventListener('click', () => adminRelease(parseInt(btn.getAttribute('data-admin-release'),10))));
+}
+
+async function adminRelease(id){
+  if(!confirm('Liberar este item? (não precisa de código, você é admin)')) return;
+  const { error } = await sb.from('diaper_items')
+    .update({ claimed_by: null, message: null, claimed_at: null, release_code: null })
+    .eq('id', id);
+  if(error){ alert('Erro: ' + error.message); return; }
+  await loadItems();
+}
+
+// Se já desbloqueou nesta aba antes, entra direto
+if(sessionStorage.getItem('diaper_admin_ok') === '1'){ boot(); }
+</script>
+</body>
+</html>
