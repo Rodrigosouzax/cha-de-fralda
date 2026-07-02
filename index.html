@@ -22,7 +22,7 @@
     --radius: 18px;
   }
   *{ box-sizing: border-box; }
-  html,body{ margin:0; padding:0; background: var(--bg); color: var(--ink); font-family: 'Karla', sans-serif; -webkit-font-smoothing: antialiased; }
+  html,body{ margin:0; padding:0; background: var(--bg); color: var(--ink); font-family: 'Karla', sans-serif; -webkit-font-smoothing: antialiased; overflow-x:hidden; }
   body{
     background-image:
       radial-gradient(circle at 15% 8%, rgba(232,183,90,0.12), transparent 40%),
@@ -78,6 +78,13 @@
   .filter-btn.active{ background: var(--sage); color:white; border-color: var(--sage); }
   .filter-check{ margin-left:auto; display:flex; align-items:center; gap:6px; font-size:13px; color: var(--ink-soft); }
   .filter-hint{ width:100%; font-size:12.5px; color: var(--ink-soft); margin: -2px 0 2px; }
+  .product-filter-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin: 14px 0 4px; padding-top:14px; border-top:1px solid var(--line); max-width:100%; }
+  .product-filter-label{ font-family:'Baloo 2'; font-weight:700; font-size:14px; color: var(--sage); }
+  #product-filter{ flex:1 1 0; min-width:0; max-width:100%; height:46px; line-height:1.2; padding:0 36px 0 14px; border-radius:12px; border:1.5px solid var(--sage-pale); font-family:'Karla'; font-size:14.5px; color:var(--ink); background-color:#F7FAF7; cursor:pointer; -webkit-appearance:none; -moz-appearance:none; appearance:none; background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235C7A6B' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>"); background-repeat:no-repeat; background-position: right 12px center; background-size:16px; }
+  @media (max-width:520px){
+    .product-filter-row{ flex-direction:column; align-items:stretch; }
+    #product-filter{ flex:none; width:100%; }
+  }
   .groups-container{ display:block; }
   @media (min-width: 900px){
     .groups-container{ display:grid; gap:20px; align-items:start; }
@@ -106,8 +113,11 @@
   label{ display:block; font-size:12.5px; font-weight:600; margin-bottom:4px; }
   .footer-note{ text-align:center; font-size:12px; color: var(--ink-soft); margin-top: 8px; line-height:1.6; }
   .item-check{ width:18px; height:18px; cursor:pointer; flex-shrink:0; accent-color: var(--coral-deep); }
-  .batch-bar{ position:fixed; left:50%; transform:translateX(-50%); bottom:16px; background: var(--ink); color:white; padding:12px 16px; border-radius:14px; display:flex; align-items:center; gap:12px; z-index:60; box-shadow:0 8px 24px rgba(0,0,0,0.25); font-size:14px; max-width:92vw; flex-wrap:wrap; justify-content:center; }
-  .batch-bar button{ font-family:'Baloo 2'; font-weight:700; font-size:13.5px; border:none; border-radius:999px; padding:9px 16px; cursor:pointer; }
+  .batch-bar{ position:fixed; left:50%; transform:translateX(-50%); bottom:16px; background: var(--ink); color:white; padding:14px 18px; border-radius:16px; display:flex; flex-direction:column; gap:10px; z-index:60; box-shadow:0 8px 24px rgba(0,0,0,0.25); font-size:13.5px; max-width:92vw; width:380px; }
+  .batch-bar-summary{ display:flex; flex-direction:column; gap:3px; }
+  .batch-bar-line{ font-size:12.5px; color:#D8E2D8; }
+  .batch-bar-actions{ display:flex; gap:10px; justify-content:center; }
+  .batch-bar button{ font-family:'Baloo 2'; font-weight:700; font-size:13.5px; border:none; border-radius:999px; padding:9px 16px; cursor:pointer; flex:1; }
   .btn-batch-confirm{ background: var(--coral-deep); color:white; }
   .btn-batch-cancel{ background:transparent; color:white; border:1px solid rgba(255,255,255,0.4); }
   .toast.show{ opacity:1; bottom:32px; }
@@ -146,9 +156,11 @@ const HOST_WHATSAPP_NUMBER = '5522992818403'; // Rodrigo — troque para '552298
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const SIZE_ORDER = ['P','M','G'];
+const PRODUCT_ORDER = ['Lenço umedecido','Pomada para assaduras','Sabonete líquido infantil','Shampoo infantil','Hidratante infantil','Óleo infantil','Algodão','Cotonetes infantis','Escova para mamadeira','Sabonete em barra infantil','Creme preventivo para assaduras'];
 
 let items = [];
 let sizeFilter = 'ALL';
+let productFilter = 'ALL';
 let onlyAvailable = false;
 let expandedRow = null;
 let selectedIds = new Set();
@@ -233,6 +245,19 @@ setInterval(() => {
   if(el) el.outerHTML = renderCountdown();
 }, 60000);
 
+function buildSelectionSummary(){
+  const selected = items.filter(i => selectedIds.has(i.id));
+  const bySize = {};
+  const byProduct = {};
+  selected.forEach(i => {
+    bySize[i.size] = (bySize[i.size] || 0) + 1;
+    byProduct[i.extra_item] = (byProduct[i.extra_item] || 0) + 1;
+  });
+  const sizeText = Object.entries(bySize).map(([s,c]) => `${c}x fralda ${s}`).join(', ');
+  const productText = Object.entries(byProduct).map(([p,c]) => `${c}x ${p}`).join(', ');
+  return { sizeText, productText, count: selected.length };
+}
+
 function render(){
   const app = document.getElementById('app');
 
@@ -284,6 +309,7 @@ function render(){
     const { total, claimed } = statsFor(size);
     const rows = items.filter(i => i.size === size)
       .filter(i => !onlyAvailable || !i.claimed_by)
+      .filter(i => productFilter === 'ALL' || i.extra_item === productFilter)
       .sort((a,b) => {
         const aTaken = a.claimed_by ? 1 : 0;
         const bTaken = b.claimed_by ? 1 : 0;
@@ -333,6 +359,18 @@ function render(){
             <span class="filter-hint">Toque num tamanho para ir direto pra ele, sem precisar rolar pelos outros.</span>
             <label class="filter-check"><input type="checkbox" id="only-available" ${onlyAvailable ? 'checked' : ''}> Só disponíveis</label>
           </div>
+          <div class="product-filter-row">
+            <label for="product-filter" class="product-filter-label">🧴 Ou procure por produto:</label>
+            <select id="product-filter">
+              <option value="ALL" ${productFilter==='ALL'?'selected':''}>Todos os produtos</option>
+              ${PRODUCT_ORDER.map(p => {
+                const list = items.filter(i => i.extra_item === p);
+                if(!list.length) return '';
+                const free = list.filter(i => !i.claimed_by).length;
+                return `<option value="${escapeHtml(p)}" ${productFilter===p?'selected':''}>${p} (${free} disponíve${free===1?'l':'is'})</option>`;
+              }).join('')}
+            </select>
+          </div>
           <div class="groups-container" style="grid-template-columns: repeat(${sizesToShow.length}, 1fr);">
           ${groupsHtml}
           </div>
@@ -350,15 +388,26 @@ function render(){
 
     <p class="footer-note">Este link pode ser aberto por qualquer pessoa, sem precisar de login ou conta. As reservas aparecem para todo mundo em tempo real.</p>
 
-    ${selectedIds.size > 0 ? `
+    ${selectedIds.size > 0 ? (() => {
+      const summary = buildSelectionSummary();
+      return `
     <div class="batch-bar">
-      <span>${selectedIds.size} ite${selectedIds.size===1?'m':'ns'} selecionado${selectedIds.size===1?'':'s'}</span>
-      <button class="btn-batch-confirm" id="batch-confirm">Reservar todos</button>
-      <button class="btn-batch-cancel" id="batch-cancel">Cancelar</button>
-    </div>` : ''}
+      <div class="batch-bar-summary">
+        <strong>${summary.count} ite${summary.count===1?'m':'ns'} selecionado${summary.count===1?'':'s'}</strong>
+        <span class="batch-bar-line">🧷 Vai precisar de: ${summary.sizeText}</span>
+        <span class="batch-bar-line">🧴 E de: ${summary.productText}</span>
+      </div>
+      <div class="batch-bar-actions">
+        <button class="btn-batch-confirm" id="batch-confirm">Reservar todos</button>
+        <button class="btn-batch-cancel" id="batch-cancel">Cancelar</button>
+      </div>
+    </div>`;
+    })() : ''}
   `;
 
   document.getElementById('only-available').addEventListener('change', (e) => { onlyAvailable = e.target.checked; render(); });
+  const productFilterEl = document.getElementById('product-filter');
+  if(productFilterEl) productFilterEl.addEventListener('change', (e) => { productFilter = e.target.value; render(); });
   document.querySelectorAll('[data-filter]').forEach(btn => btn.addEventListener('click', () => { sizeFilter = btn.getAttribute('data-filter'); render(); }));
   document.querySelectorAll('[data-reserve]').forEach(btn => btn.addEventListener('click', () => { expandedRow = parseInt(btn.getAttribute('data-reserve'),10); render(); }));
   document.querySelectorAll('[data-cancel]').forEach(btn => btn.addEventListener('click', () => { expandedRow = null; render(); }));
@@ -452,6 +501,10 @@ async function onConfirmReserve(id){
 }
 
 async function onBatchReserve(){
+  const summary = buildSelectionSummary();
+  const confirmMsg = `Você está reservando ${summary.count} ite${summary.count===1?'m':'ns'}. Isso significa trazer:\n\n🧷 ${summary.sizeText}\n🧴 ${summary.productText}\n\n(Repare que produtos repetidos, tipo "2x Lenço umedecido", precisam de 2 pacotes separados, um para cada número reservado.)\n\nConfirma?`;
+  if(!confirm(confirmMsg)) return;
+
   const name = prompt(`Seu nome (vai ser usado para os ${selectedIds.size} itens selecionados):`);
   if(!name || !name.trim()) return;
   const message = prompt('Recadinho opcional (o mesmo vale para todos, pode deixar em branco):') || '';
