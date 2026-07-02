@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chá de Fralda de Maria Luiza</title>
+<title>Chá de Fralda</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Karla:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -48,10 +48,16 @@
   .size-count{ font-family:'Space Mono', monospace; font-size:12.5px; color: var(--ink-soft); }
   .progress-track{ margin-top:8px; height:10px; border-radius:999px; background: var(--sage-pale); overflow:hidden; }
   .progress-fill{ height:100%; border-radius:999px; background: linear-gradient(90deg, var(--coral), var(--coral-deep)); transition: width .3s ease; }
-  .filter-bar{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:4px; }
-  .filter-btn{ font-family:'Baloo 2'; font-weight:700; font-size:13.5px; background: #F2F6F2; color: var(--sage); border:1.5px solid var(--sage-pale); padding:7px 16px; border-radius:999px; cursor:pointer; }
+  .filter-bar{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:4px; }
+  .filter-btn{ font-family:'Baloo 2'; font-weight:700; font-size:15px; background: #F2F6F2; color: var(--sage); border:2px solid var(--sage-pale); padding:12px 20px; border-radius:14px; cursor:pointer; }
   .filter-btn.active{ background: var(--sage); color:white; border-color: var(--sage); }
   .filter-check{ margin-left:auto; display:flex; align-items:center; gap:6px; font-size:13px; color: var(--ink-soft); }
+  .filter-hint{ width:100%; font-size:12.5px; color: var(--ink-soft); margin: -2px 0 2px; }
+  .groups-container{ display:block; }
+  @media (min-width: 900px){
+    .groups-container{ display:grid; gap:20px; align-items:start; }
+    .size-column{ max-height: 72vh; overflow-y:auto; padding-right:8px; }
+  }
   .group-header{ display:flex; justify-content:space-between; align-items:baseline; margin: 20px 0 8px; position: sticky; top: 0; background: var(--card); padding: 10px 0; z-index: 5; border-bottom: 2px solid var(--sage-pale); }
   .group-header:first-child{ margin-top:2px; }
   .group-title{ font-family:'Baloo 2'; font-weight:700; font-size:17px; }
@@ -98,7 +104,7 @@ const SUPABASE_URL = 'https://hlenzywbobdinapytwre.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_HighvqdWWG7FhY8qYYC7sA_IjiSuaYs';
 
 /* Nome do bebê exibido no topo da página */
-const BABY_NAME = 'Maria Luiza'; // troque, ex: 'Alice'
+const BABY_NAME = 'nosso bebê'; // troque, ex: 'Alice'
 /* ======================================================= */
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -175,8 +181,10 @@ function render(){
       .filter(i => !onlyAvailable || !i.claimed_by)
       .map(i => renderItemRow(i)).join('');
     return `
-      <div class="group-header"><span class="group-title">Fralda ${size}</span><span class="group-sub">${claimed}/${total} reservados</span></div>
-      ${rows || '<p style="font-size:13px;color:var(--ink-soft);">Nenhum item disponível com esse filtro.</p>'}`;
+      <div class="size-column">
+        <div class="group-header"><span class="group-title">Fralda ${size}</span><span class="group-sub">${claimed}/${total} reservados</span></div>
+        ${rows || '<p style="font-size:13px;color:var(--ink-soft);">Nenhum item disponível com esse filtro.</p>'}
+      </div>`;
   }).join('');
 
   app.innerHTML = `
@@ -200,11 +208,14 @@ function render(){
 
     <div class="card">
       <div class="filter-bar">
-        <button class="filter-btn ${sizeFilter==='ALL'?'active':''}" data-filter="ALL">Todos</button>
-        ${SIZE_ORDER.map(s => `<button class="filter-btn ${sizeFilter===s?'active':''}" data-filter="${s}">${s}</button>`).join('')}
+        <button class="filter-btn ${sizeFilter==='ALL'?'active':''}" data-filter="ALL">Ver todos</button>
+        ${SIZE_ORDER.map(s => { const st = statsFor(s); return `<button class="filter-btn ${sizeFilter===s?'active':''}" data-filter="${s}">Só ${s} (${st.total - st.claimed} livres)</button>`; }).join('')}
+        <span class="filter-hint">Toque num tamanho para ir direto pra ele, sem precisar rolar pelos outros.</span>
         <label class="filter-check"><input type="checkbox" id="only-available" ${onlyAvailable ? 'checked' : ''}> Só disponíveis</label>
       </div>
+      <div class="groups-container" style="grid-template-columns: repeat(${sizesToShow.length}, 1fr);">
       ${groupsHtml}
+      </div>
     </div>
 
     <p class="footer-note">Este link pode ser aberto por qualquer pessoa, sem precisar de login ou conta. As reservas aparecem para todo mundo em tempo real.</p>
