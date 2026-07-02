@@ -37,6 +37,7 @@
   .filter-row{ display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
   .filter-row button{ font-family:'Baloo 2'; font-weight:700; font-size:13px; background:#F2F6F2; color:var(--sage); border:1.5px solid var(--sage-pale); padding:7px 14px; border-radius:999px; cursor:pointer; }
   .filter-row button.active{ background:var(--sage); color:white; }
+  .btn-download{ font-family:'Baloo 2'; font-weight:700; font-size:14px; background:var(--coral-deep); color:white; border:none; padding:11px 20px; border-radius:999px; cursor:pointer; }
   .refresh-note{ font-size:12px; color:var(--ink-soft); text-align:right; margin-top:8px; }
 </style>
 </head>
@@ -154,6 +155,9 @@ function render(){
         <div class="stat-box"><span class="stat-num">${free}</span><span class="stat-label">Ainda livres</span></div>
         ${statBoxes}
       </div>
+      <div style="text-align:center; margin-top:16px;">
+        <button id="download-csv" class="btn-download">⬇️ Baixar lista completa (planilha)</button>
+      </div>
     </div>
 
     <div class="card">
@@ -177,6 +181,30 @@ function render(){
   document.getElementById('search').value = searchTerm;
   document.querySelectorAll('[data-status]').forEach(btn => btn.addEventListener('click', () => { statusFilter = btn.getAttribute('data-status'); render(); }));
   document.querySelectorAll('[data-admin-release]').forEach(btn => btn.addEventListener('click', () => adminRelease(parseInt(btn.getAttribute('data-admin-release'),10))));
+  document.getElementById('download-csv').addEventListener('click', downloadCSV);
+}
+
+function downloadCSV(){
+  const escapeCsv = (val) => {
+    const str = val == null ? '' : String(val);
+    if(/[",\n;]/.test(str)) return '"' + str.replace(/"/g, '""') + '"';
+    return str;
+  };
+  const headers = ['Numero','Tamanho','Item','Reservado_por','Mensagem','Data_Hora'];
+  const rows = items.map(i => [
+    i.id, i.size, i.extra_item, i.claimed_by || '(disponível)', i.message || '',
+    i.claimed_at ? new Date(i.claimed_at).toLocaleString('pt-BR') : ''
+  ].map(escapeCsv).join(','));
+  const csvContent = [headers.join(','), ...rows].join('\r\n');
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `cha-de-fralda-reservas-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 async function adminRelease(id){
