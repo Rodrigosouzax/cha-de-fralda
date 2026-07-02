@@ -36,6 +36,14 @@
     .page-grid{ display:grid; grid-template-columns: 1fr 340px; gap:24px; align-items:start; }
     .side-col{ position: sticky; top: 20px; max-height: 88vh; overflow-y:auto; }
   }
+  .countdown{ display:flex; justify-content:center; gap:14px; flex-wrap:wrap; margin-top:16px; }
+  .countdown-unit{ background: var(--card); border:1px solid var(--line); border-radius:14px; padding:10px 16px; min-width:64px; text-align:center; }
+  .countdown-num{ font-family:'Space Mono', monospace; font-weight:700; font-size:22px; color: var(--coral-deep); display:block; }
+  .countdown-label{ font-size:11px; color: var(--ink-soft); text-transform:uppercase; letter-spacing:.05em; }
+  .confirm-banner{ background: linear-gradient(135deg, rgba(92,122,107,0.14), rgba(201,218,203,0.3)); border:1px solid var(--sage-pale); }
+  .confirm-banner .label{ font-family:'Baloo 2'; font-weight:700; font-size:14px; color: var(--sage); }
+  .whatsapp-btn{ display:inline-flex; align-items:center; gap:8px; background:#25D366; color:white; font-family:'Baloo 2'; font-weight:700; font-size:14px; padding:10px 18px; border-radius:999px; text-decoration:none; margin-top:10px; }
+  .confirm-code{ font-family:'Space Mono', monospace; font-weight:700; background:white; padding:3px 8px; border-radius:6px; border:1px solid var(--sage-pale); }
   .mural-item{ padding:12px 0; border-bottom:1px solid var(--line); }
   .mural-item:last-child{ border-bottom:none; }
   .mural-name{ font-weight:700; font-size:14px; }
@@ -120,6 +128,14 @@ const SUPABASE_ANON_KEY = 'sb_publishable_HighvqdWWG7FhY8qYYC7sA_IjiSuaYs';
 
 /* Nome do bebê exibido no topo da página */
 const BABY_NAME = 'Maria Luiza';
+
+/* Data e hora do chá — formato: 'AAAA-MM-DDTHH:MM:00' (horário local) */
+const EVENT_DATE = '2026-07-18T16:00:00'; // 18/07/2026 às 16h
+
+/* Número de WhatsApp de quem vai receber as confirmações.
+   Formato: código do país + DDD + número, só números, sem espaços/traços.
+   Exemplo Brasil (21) 99999-9999 => '5521999999999' */
+const HOST_WHATSAPP_NUMBER = '5522992818403'; // Rodrigo — troque para '5522988150701' se preferir o da Sâmi
 /* ======================================================= */
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -130,6 +146,13 @@ let sizeFilter = 'ALL';
 let onlyAvailable = false;
 let expandedRow = null;
 let selectedIds = new Set();
+let lastConfirmation = null;
+
+function buildWhatsAppLink(conf){
+  const itemsText = conf.items.map(it => `Nº ${it.id} (fralda ${it.size} + ${it.extra})`).join(', ');
+  const text = `Oi! Aqui é ${conf.name}. Acabei de reservar no Chá de Fralda da ${BABY_NAME}: ${itemsText}. 💛`;
+  return `https://wa.me/${HOST_WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
+}
 
 function showToast(msg){
   const t = document.getElementById('toast');
@@ -177,6 +200,32 @@ function buildMural(){
     </div>`).join('');
 }
 
+function renderCountdown(){
+  const target = new Date(EVENT_DATE).getTime();
+  const now = Date.now();
+  const diff = target - now;
+
+  if(isNaN(target)) return '';
+  if(diff <= 0){
+    return `<div class="countdown"><div class="countdown-unit" style="min-width:auto; padding:10px 22px;"><span class="countdown-label" style="font-size:14px; color:var(--sage);">🎉 O grande dia chegou!</span></div></div>`;
+  }
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const mins = Math.floor((diff % 3600000) / 60000);
+  return `
+    <div class="countdown">
+      <div class="countdown-unit"><span class="countdown-num">${days}</span><span class="countdown-label">dia${days===1?'':'s'}</span></div>
+      <div class="countdown-unit"><span class="countdown-num">${hours}</span><span class="countdown-label">hora${hours===1?'':'s'}</span></div>
+      <div class="countdown-unit"><span class="countdown-num">${mins}</span><span class="countdown-label">min</span></div>
+    </div>`;
+}
+
+// Atualiza só o contador a cada minuto, sem recarregar a lista inteira
+setInterval(() => {
+  const el = document.querySelector('.countdown');
+  if(el) el.outerHTML = renderCountdown();
+}, 60000);
+
 function render(){
   const app = document.getElementById('app');
 
@@ -202,6 +251,17 @@ function render(){
     ? `<div class="card priority"><span class="label">🎯 Ainda tem bastante item livre em:</span>${needy.map(n => `<span class="chip">${n.size}</span>`).join('')}</div>`
     : `<div class="card priority done"><span class="label">🎉 Todos os 100 itens da lista já foram reservados!</span></div>`;
 
+  const confirmBanner = lastConfirmation ? `
+    <div class="card confirm-banner">
+      <span class="label">🎉 Reservado, ${escapeHtml(lastConfirmation.name)}!</span>
+      <p style="font-size:13.5px; color:var(--ink-soft); margin:8px 0;">
+        ${lastConfirmation.items.map(it => `Nº ${it.id} (fralda ${it.size} + ${escapeHtml(it.extra)})`).join('<br>')}
+      </p>
+      <p style="font-size:13px; color:var(--ink-soft);">Guarde este código caso queira desfazer depois: <span class="confirm-code">${lastConfirmation.code}</span></p>
+      <a class="whatsapp-btn" href="${buildWhatsAppLink(lastConfirmation)}" target="_blank" rel="noopener">📱 Confirmar no WhatsApp</a>
+      <div style="margin-top:10px;"><button id="dismiss-confirm" style="background:none;border:none;color:var(--ink-soft);text-decoration:underline;cursor:pointer;font-size:12px;">fechar</button></div>
+    </div>` : '';
+
   const sizesToShow = sizeFilter === 'ALL' ? SIZE_ORDER : [sizeFilter];
   const groupsHtml = sizesToShow.map(size => {
     const { total, claimed } = statsFor(size);
@@ -220,10 +280,12 @@ function render(){
       <span class="eyebrow">Você foi convidado(a) para o</span>
       <h1 class="title">Chá de Fralda de ${escapeHtml(BABY_NAME)}</h1>
       <p class="subtitle">Escolha um número disponível na lista abaixo. Cada item já vem combinado com uma fralda + um produtinho, então é só reservar o seu e trazer os dois juntos. Obrigado por fazer parte disso! 💛</p>
+      ${renderCountdown()}
     </header>
 
     <div class="page-grid">
       <div class="main-col">
+        ${confirmBanner}
         ${priorityBlock}
 
         <div class="card">
@@ -283,6 +345,8 @@ function render(){
   if(batchConfirmBtn) batchConfirmBtn.addEventListener('click', onBatchReserve);
   const batchCancelBtn = document.getElementById('batch-cancel');
   if(batchCancelBtn) batchCancelBtn.addEventListener('click', () => { selectedIds.clear(); render(); });
+  const dismissBtn = document.getElementById('dismiss-confirm');
+  if(dismissBtn) dismissBtn.addEventListener('click', () => { lastConfirmation = null; render(); });
 }
 
 function renderItemRow(item){
@@ -338,7 +402,14 @@ async function onConfirmReserve(id){
   localStorage.setItem('diaper_release_' + id, releaseCode);
   expandedRow = null;
   await loadItems();
-  alert('Reservado! Guarde este código caso queira desfazer a reserva depois:\n\n' + releaseCode + '\n\n(Neste mesmo aparelho e navegador, o botão "liberar" já vai lembrar sozinho.)');
+  const reservedItem = items.find(i => i.id === id);
+  lastConfirmation = {
+    name,
+    code: releaseCode,
+    items: [{ id, size: reservedItem ? reservedItem.size : '', extra: reservedItem ? reservedItem.extra_item : '' }]
+  };
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 async function onBatchReserve(){
@@ -367,7 +438,14 @@ async function onBatchReserve(){
   await loadItems();
 
   if(ok > 0){
-    alert(`Reservados ${ok} ite${ok===1?'m':'ns'}! Guarde este código caso queira desfazer qualquer um deles depois:\n\n${releaseCode}\n\n(O mesmo código libera qualquer item que você reservou agora.)`);
+    const reservedNow = items.filter(i => ids.includes(i.id) && i.release_code === releaseCode);
+    lastConfirmation = {
+      name: name.trim(),
+      code: releaseCode,
+      items: reservedNow.map(i => ({ id: i.id, size: i.size, extra: i.extra_item }))
+    };
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   if(fail > 0){
     showToast(`${fail} ite${fail===1?'m':'ns'} já ${fail===1?'tinha':'tinham'} sido reservado(s) por outra pessoa antes de você confirmar.`);
