@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chá de Fralda de Maria Luiza</title>
+<title>Chá de Fralda</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Karla:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -30,6 +30,17 @@
     min-height: 100vh; padding: 32px 16px 64px;
   }
   .wrap{ max-width: 760px; margin: 0 auto; }
+  .page-grid{ display:block; }
+  @media (min-width: 1100px){
+    .wrap{ max-width: 1180px; }
+    .page-grid{ display:grid; grid-template-columns: 1fr 340px; gap:24px; align-items:start; }
+    .side-col{ position: sticky; top: 20px; max-height: 88vh; overflow-y:auto; }
+  }
+  .mural-item{ padding:12px 0; border-bottom:1px solid var(--line); }
+  .mural-item:last-child{ border-bottom:none; }
+  .mural-name{ font-weight:700; font-size:14px; }
+  .mural-meta{ font-family:'Space Mono', monospace; font-size:11px; color: var(--sage); margin-top:2px; }
+  .mural-msg{ font-size:13px; color: var(--ink-soft); font-style:italic; margin-top:4px; line-height:1.4; }
   h1,h2,h3{ font-family: 'Baloo 2', sans-serif; margin: 0; }
   header.hero{ text-align:center; margin-bottom: 24px; }
   .eyebrow{ font-family:'Space Mono', monospace; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--sage); font-weight:700; display:block; margin-bottom:8px; }
@@ -62,12 +73,12 @@
   .group-header:first-child{ margin-top:2px; }
   .group-title{ font-family:'Baloo 2'; font-weight:700; font-size:17px; }
   .group-sub{ font-family:'Space Mono', monospace; font-size:12px; color: var(--ink-soft); }
-  .item-row{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding: 10px 12px; border-radius: 12px; margin-bottom:6px; background:#FBFDFB; border:1px solid var(--line); }
+  .item-row{ display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:6px 10px; padding: 10px 12px; border-radius: 12px; margin-bottom:6px; background:#FBFDFB; border:1px solid var(--line); }
   .item-row.taken{ background:#F5F2ED; }
-  .item-left{ display:flex; align-items:baseline; gap:10px; min-width:0; }
+  .item-left{ display:flex; align-items:baseline; flex-wrap:wrap; gap:6px 10px; min-width:0; flex:1 1 160px; }
   .item-num{ font-family:'Space Mono', monospace; font-weight:700; font-size:13px; color: var(--sage); flex-shrink:0; }
-  .item-desc{ font-size:14px; }
-  .item-right{ flex-shrink:0; display:flex; align-items:center; gap:8px; }
+  .item-desc{ font-size:14px; line-height:1.4; }
+  .item-right{ flex:0 0 auto; display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; }
   .btn-reserve{ font-family:'Baloo 2'; font-weight:700; font-size:13px; background: var(--coral-deep); color:white; border:none; padding:7px 14px; border-radius:999px; cursor:pointer; }
   .btn-release{ font-family:'Karla'; font-size:11.5px; color: var(--ink-soft); background:none; border:none; text-decoration:underline; cursor:pointer; padding:2px; }
   .badge-taken{ font-family:'Space Mono', monospace; font-size:11px; font-weight:700; color: var(--sage); background: var(--sage-pale); padding:3px 9px; border-radius:999px; }
@@ -104,7 +115,7 @@ const SUPABASE_URL = 'https://hlenzywbobdinapytwre.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_HighvqdWWG7FhY8qYYC7sA_IjiSuaYs';
 
 /* Nome do bebê exibido no topo da página */
-const BABY_NAME = 'Maria Luiza'; // troque, ex: 'Alice'
+const BABY_NAME = 'Maria Luiza';
 /* ======================================================= */
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -149,6 +160,18 @@ function statsFor(size){
   return { total: list.length, claimed };
 }
 
+function buildMural(){
+  const claimed = items.filter(i => i.claimed_by)
+    .sort((a,b) => new Date(b.claimed_at || 0) - new Date(a.claimed_at || 0));
+  if(!claimed.length) return `<p style="font-size:13px;color:var(--ink-soft);">Ainda ninguém reservou nada por aqui. Seja a primeira pessoa! 💛</p>`;
+  return claimed.map(i => `
+    <div class="mural-item">
+      <div class="mural-name">${escapeHtml(i.claimed_by)}</div>
+      <div class="mural-meta">Nº ${i.id} · fralda ${i.size} + ${escapeHtml(i.extra_item)}</div>
+      ${i.message ? `<div class="mural-msg">"${escapeHtml(i.message)}"</div>` : ''}
+    </div>`).join('');
+}
+
 function render(){
   const app = document.getElementById('app');
 
@@ -189,32 +212,44 @@ function render(){
 
   app.innerHTML = `
     <header class="hero">
-      <span class="eyebrow">Chá de Fralda</span>
-      <h1 class="title">Fraldas para ${escapeHtml(BABY_NAME)}</h1>
+      <span class="eyebrow">Você foi convidado(a) para o</span>
+      <h1 class="title">Chá de Fralda de ${escapeHtml(BABY_NAME)}</h1>
       <p class="subtitle">Escolha um número disponível na lista abaixo. Cada item já vem combinado com uma fralda + um produtinho, então é só reservar o seu e trazer os dois juntos. Obrigado por fazer parte disso! 💛</p>
     </header>
 
-    ${priorityBlock}
+    <div class="page-grid">
+      <div class="main-col">
+        ${priorityBlock}
 
-    <div class="card">
-      <h2 style="font-size:18px; margin-bottom:6px;">Progresso geral</h2>
-      ${overviewRows}
-    </div>
+        <div class="card">
+          <h2 style="font-size:18px; margin-bottom:6px;">Progresso geral</h2>
+          ${overviewRows}
+        </div>
 
-    <div class="card" style="background:#F2F6F2; border-color:var(--sage-pale);">
-      <strong style="font-family:'Baloo 2'; font-size:14px; color:var(--sage);">💡 Como funciona:</strong>
-      <span style="font-size:13.5px; color:var(--ink-soft);"> cada número da lista já é um combo — <strong>1 pacote de fralda do tamanho indicado + o produto ao lado</strong>. Escolha um número disponível e traga os dois itens juntos.</span>
-    </div>
+        <div class="card" style="background:#F2F6F2; border-color:var(--sage-pale);">
+          <strong style="font-family:'Baloo 2'; font-size:14px; color:var(--sage);">💡 Como funciona:</strong>
+          <span style="font-size:13.5px; color:var(--ink-soft);"> cada número da lista já é um combo — <strong>1 pacote de fralda do tamanho indicado + o produto ao lado</strong>. Escolha um número disponível e traga os dois itens juntos.</span>
+        </div>
 
-    <div class="card">
-      <div class="filter-bar">
-        <button class="filter-btn ${sizeFilter==='ALL'?'active':''}" data-filter="ALL">Ver todos</button>
-        ${SIZE_ORDER.map(s => { const st = statsFor(s); return `<button class="filter-btn ${sizeFilter===s?'active':''}" data-filter="${s}">Só ${s} (${st.total - st.claimed} livres)</button>`; }).join('')}
-        <span class="filter-hint">Toque num tamanho para ir direto pra ele, sem precisar rolar pelos outros.</span>
-        <label class="filter-check"><input type="checkbox" id="only-available" ${onlyAvailable ? 'checked' : ''}> Só disponíveis</label>
+        <div class="card">
+          <div class="filter-bar">
+            <button class="filter-btn ${sizeFilter==='ALL'?'active':''}" data-filter="ALL">Ver todos</button>
+            ${SIZE_ORDER.map(s => { const st = statsFor(s); return `<button class="filter-btn ${sizeFilter===s?'active':''}" data-filter="${s}">Só ${s} (${st.total - st.claimed} livres)</button>`; }).join('')}
+            <span class="filter-hint">Toque num tamanho para ir direto pra ele, sem precisar rolar pelos outros.</span>
+            <label class="filter-check"><input type="checkbox" id="only-available" ${onlyAvailable ? 'checked' : ''}> Só disponíveis</label>
+          </div>
+          <div class="groups-container" style="grid-template-columns: repeat(${sizesToShow.length}, 1fr);">
+          ${groupsHtml}
+          </div>
+        </div>
       </div>
-      <div class="groups-container" style="grid-template-columns: repeat(${sizesToShow.length}, 1fr);">
-      ${groupsHtml}
+
+      <div class="side-col">
+        <div class="card">
+          <h2 style="font-size:16px; margin-bottom:4px;">💌 Mural de recados</h2>
+          <p style="font-size:12px; color:var(--ink-soft); margin-bottom:10px;">As mensagens carinhosas de quem já reservou aparecem aqui.</p>
+          ${buildMural()}
+        </div>
       </div>
     </div>
 
