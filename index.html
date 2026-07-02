@@ -12,7 +12,7 @@
     --bg: #EAF1EA;
     --card: #FFFFFF;
     --ink: #253434;
-    --ink-soft: #5C6E6E;
+    --ink-soft: #47585A;
     --coral: #F4886B;
     --coral-deep: #E06B4C;
     --gold: #E8B75A;
@@ -44,6 +44,12 @@
   .confirm-banner .label{ font-family:'Baloo 2'; font-weight:700; font-size:14px; color: var(--sage); }
   .whatsapp-btn{ display:inline-flex; align-items:center; gap:8px; background:#25D366; color:white; font-family:'Baloo 2'; font-weight:700; font-size:14px; padding:10px 18px; border-radius:999px; text-decoration:none; margin-top:10px; }
   .confirm-code{ font-family:'Space Mono', monospace; font-weight:700; background:white; padding:3px 8px; border-radius:6px; border:1px solid var(--sage-pale); }
+  .how-to{ background:#F2F6F2; border-color:var(--sage-pale); }
+  .how-step{ display:flex; align-items:center; gap:14px; padding:8px 0; font-size:15.5px; }
+  .how-num{ font-family:'Baloo 2'; font-weight:800; font-size:18px; color:white; background:var(--sage); width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .how-num.how-num-alt{ background: var(--gold); }
+  .btn-multi-toggle{ font-family:'Baloo 2'; font-weight:700; font-size:15.5px; background: var(--gold); color:white; border:none; padding:14px 26px; border-radius:14px; cursor:pointer; box-shadow: 0 6px 16px rgba(232,183,90,0.4); display:inline-flex; align-items:center; gap:10px; }
+  .btn-multi-toggle.active{ background: var(--sage); box-shadow: 0 6px 16px rgba(92,122,107,0.35); }
   .mural-item{ padding:12px 0; border-bottom:1px solid var(--line); }
   .mural-item:last-child{ border-bottom:none; }
   .mural-name{ font-weight:700; font-size:14px; }
@@ -85,9 +91,9 @@
   .item-row.taken{ background:#F5F2ED; }
   .item-left{ display:flex; align-items:baseline; flex-wrap:wrap; gap:6px 10px; min-width:0; flex:1 1 160px; }
   .item-num{ font-family:'Space Mono', monospace; font-weight:700; font-size:13px; color: var(--sage); flex-shrink:0; }
-  .item-desc{ font-size:14px; line-height:1.4; }
+  .item-desc{ font-size:15.5px; line-height:1.4; }
   .item-right{ flex:0 0 auto; display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; }
-  .btn-reserve{ font-family:'Baloo 2'; font-weight:700; font-size:13px; background: var(--coral-deep); color:white; border:none; padding:7px 14px; border-radius:999px; cursor:pointer; }
+  .btn-reserve{ font-family:'Baloo 2'; font-weight:700; font-size:14.5px; background: var(--coral-deep); color:white; border:none; padding:10px 18px; border-radius:999px; cursor:pointer; }
   .btn-release{ font-family:'Karla'; font-size:11.5px; color: var(--ink-soft); background:none; border:none; text-decoration:underline; cursor:pointer; padding:2px; }
   .badge-taken{ font-family:'Space Mono', monospace; font-size:11px; font-weight:700; color: var(--sage); background: var(--sage-pale); padding:3px 9px; border-radius:999px; }
   .reserve-form{ grid-column: 1 / -1; width:100%; margin-top:8px; padding-top:10px; border-top:1px dashed var(--line); }
@@ -146,6 +152,7 @@ let sizeFilter = 'ALL';
 let onlyAvailable = false;
 let expandedRow = null;
 let selectedIds = new Set();
+let multiMode = false;
 let lastConfirmation = null;
 
 function buildWhatsAppLink(conf){
@@ -229,6 +236,16 @@ setInterval(() => {
 function render(){
   const app = document.getElementById('app');
 
+  // Guarda a posição de rolagem de cada coluna e do mural antes de redesenhar,
+  // para não "pular" a tela quando o usuário abre um formulário ou marca um filtro.
+  const scrollState = {};
+  document.querySelectorAll('.size-column[data-size]').forEach(el => {
+    scrollState[el.getAttribute('data-size')] = el.scrollTop;
+  });
+  const sideColBefore = document.querySelector('.side-col');
+  if(sideColBefore) scrollState.__side__ = sideColBefore.scrollTop;
+  const pageScrollY = window.scrollY;
+
   const overviewRows = SIZE_ORDER.map(size => {
     const { total, claimed } = statsFor(size);
     const pct = total ? Math.round((claimed/total)*100) : 0;
@@ -257,7 +274,7 @@ function render(){
       <p style="font-size:13.5px; color:var(--ink-soft); margin:8px 0;">
         ${lastConfirmation.items.map(it => `Nº ${it.id} (fralda ${it.size} + ${escapeHtml(it.extra)})`).join('<br>')}
       </p>
-      <p style="font-size:13px; color:var(--ink-soft);">Guarde este código caso queira desfazer depois: <span class="confirm-code">${lastConfirmation.code}</span></p>
+      <p style="font-size:13px; color:var(--ink-soft);">Tudo certo, não precisa fazer mais nada! Se um dia mudar de ideia, é só voltar aqui e usar este código: <span class="confirm-code">${lastConfirmation.code}</span></p>
       <a class="whatsapp-btn" href="${buildWhatsAppLink(lastConfirmation)}" target="_blank" rel="noopener">📱 Confirmar no WhatsApp</a>
       <div style="margin-top:10px;"><button id="dismiss-confirm" style="background:none;border:none;color:var(--ink-soft);text-decoration:underline;cursor:pointer;font-size:12px;">fechar</button></div>
     </div>` : '';
@@ -267,9 +284,15 @@ function render(){
     const { total, claimed } = statsFor(size);
     const rows = items.filter(i => i.size === size)
       .filter(i => !onlyAvailable || !i.claimed_by)
+      .sort((a,b) => {
+        const aTaken = a.claimed_by ? 1 : 0;
+        const bTaken = b.claimed_by ? 1 : 0;
+        if(aTaken !== bTaken) return aTaken - bTaken;
+        return a.id - b.id;
+      })
       .map(i => renderItemRow(i)).join('');
     return `
-      <div class="size-column">
+      <div class="size-column" data-size="${size}">
         <div class="group-header"><span class="group-title">Fralda ${size}</span><span class="group-sub">${claimed}/${total} reservados</span></div>
         ${rows || '<p style="font-size:13px;color:var(--ink-soft);">Nenhum item disponível com esse filtro.</p>'}
       </div>`;
@@ -293,9 +316,14 @@ function render(){
           ${overviewRows}
         </div>
 
-        <div class="card" style="background:#F2F6F2; border-color:var(--sage-pale);">
-          <strong style="font-family:'Baloo 2'; font-size:14px; color:var(--sage);">💡 Como funciona:</strong>
-          <span style="font-size:13.5px; color:var(--ink-soft);"> cada número da lista já é um combo — <strong>1 pacote de fralda do tamanho indicado + o produto ao lado</strong>. Escolha um número disponível e traga os dois itens juntos. Quer dar mais de um pacote? Marque a caixinha de vários itens e reserve todos de uma vez, no botão que aparece no final da tela.</span>
+        <div class="card how-to">
+          <div class="how-step"><span class="how-num">1</span><span>Escolha um número disponível na lista abaixo</span></div>
+          <div class="how-step"><span class="how-num">2</span><span>Toque em <strong>"Reservar"</strong> e escreva seu nome</span></div>
+          <div class="how-step"><span class="how-num">3</span><span>Traga a fralda + o produto do número escolhido no dia do chá</span></div>
+          <div class="how-step"><span class="how-num how-num-alt">4</span><span>Quer dar <strong>mais de um pacote</strong>? Toque no botão abaixo para marcar vários itens e reservar todos de uma vez só</span></div>
+          <div style="margin-top:14px; text-align:center;">
+            <button class="btn-multi-toggle ${multiMode ? 'active' : ''}" id="toggle-multi">${multiMode ? '✓ Modo de vários pacotes ativado' : '➕ Quero dar mais de um pacote de fralda'}</button>
+          </div>
         </div>
 
         <div class="card">
@@ -347,6 +375,17 @@ function render(){
   if(batchCancelBtn) batchCancelBtn.addEventListener('click', () => { selectedIds.clear(); render(); });
   const dismissBtn = document.getElementById('dismiss-confirm');
   if(dismissBtn) dismissBtn.addEventListener('click', () => { lastConfirmation = null; render(); });
+  const toggleMultiBtn = document.getElementById('toggle-multi');
+  if(toggleMultiBtn) toggleMultiBtn.addEventListener('click', () => { multiMode = !multiMode; if(!multiMode) selectedIds.clear(); render(); });
+
+  // Restaura a posição de rolagem capturada antes de redesenhar
+  document.querySelectorAll('.size-column[data-size]').forEach(el => {
+    const key = el.getAttribute('data-size');
+    if(scrollState[key] != null) el.scrollTop = scrollState[key];
+  });
+  const sideColAfter = document.querySelector('.side-col');
+  if(sideColAfter && scrollState.__side__ != null) sideColAfter.scrollTop = scrollState.__side__;
+  window.scrollTo(0, pageScrollY);
 }
 
 function renderItemRow(item){
@@ -358,7 +397,7 @@ function renderItemRow(item){
       <div class="item-right"><span class="badge-taken">Reservado por ${escapeHtml(item.claimed_by)}</span><button class="btn-release" data-release="${item.id}">liberar</button></div>`;
   } else {
     inner = `
-      <div class="item-left"><input type="checkbox" class="item-check" data-check="${item.id}" ${selectedIds.has(item.id) ? 'checked' : ''}><span class="item-num">Nº ${item.id}</span><span class="item-desc"><strong>1 pacote de fralda ${item.size}</strong> + ${escapeHtml(item.extra_item)}</span></div>
+      <div class="item-left">${multiMode ? `<input type="checkbox" class="item-check" data-check="${item.id}" ${selectedIds.has(item.id) ? 'checked' : ''}>` : ''}<span class="item-num">Nº ${item.id}</span><span class="item-desc"><strong>1 pacote de fralda ${item.size}</strong> + ${escapeHtml(item.extra_item)}</span></div>
       <div class="item-right"><button class="btn-reserve" data-reserve="${item.id}">Reservar</button></div>`;
   }
   const formHtml = expandedRow === item.id && !taken ? `
